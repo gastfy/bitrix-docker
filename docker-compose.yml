@@ -1,0 +1,105 @@
+services:
+  php:
+    build: ./php
+    volumes_from:
+      - source
+    links:
+      - db
+      - redis
+    environment:
+      TZ: Europe/Moscow
+    stdin_open: true
+    tty: true
+    networks:
+      - bitrix
+    restart: unless-stopped
+
+  web_server:
+    build: ./nginx
+    depends_on:
+      - source
+    volumes_from:
+      - source
+    ports:
+      - '0.0.0.0:80:80'
+      - '0.0.0.0:443:443'
+    links:
+      - php
+    networks:
+      - bitrix
+    environment:
+      TZ: Europe/Moscow
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  db:
+    build: ./mysql
+    volumes:
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    volumes_from:
+      - source
+    ports:
+      - '0.0.0.0:3306:3306'
+    environment:
+      MYSQL_DATABASE: bitrix
+      MYSQL_USER: bitrix
+      MYSQL_PASSWORD: 123
+      MYSQL_ROOT_PASSWORD: 123
+      TZ: Europe/Moscow
+    command: mysqld --user=root --sql-mode=""
+    networks:
+      - bitrix
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  redis:
+    image: redis:latest
+    volumes_from:
+      - source
+    networks:
+      - bitrix
+    environment:
+      TZ: Europe/Moscow
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  adminer:
+    image: dockette/adminer:full
+    links:
+      - db:db
+    ports:
+      - '0.0.0.0:8080:80'
+    environment:
+      UPLOAD: 1024M
+      TZ: Europe/Moscow
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    networks:
+      - bitrix
+
+  source:
+    image: alpine:latest
+    volumes:
+      - ./logs/nginx-logs:/var/log/nginx
+      - ./logs/php-logs:/var/log/php
+      - ./logs/db:/var/log/mysql
+      - ./logs/redis:/var/log/redis
+      - mysql-data:/var/lib/mysql
+      - redis-data:/var/lib/redis/data
+      - ./bitrix-files:/var/www/bitrix
+      - /etc/localtime:/etc/localtime/:ro
+    networks:
+      - bitrix
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  bitrix:
